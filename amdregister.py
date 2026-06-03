@@ -31,6 +31,8 @@ IMAP_HOST = CFG["imap_host"]
 IMAP_USER = CFG["imap_user"]
 IMAP_PW = CFG["imap_password"]
 PROXY_LIST = CFG.get("proxy_list", [])
+GMAIL_PLUS_BASE = CFG.get("gmail_plus_base", "")
+EMAIL_DOMAIN = CFG.get("email_domain", "")
 
 REGISTER_URL = "https://www.amd.com/en/registration/ai-dev-program-sign-up-form.html"
 CUSTTARG = "aHR0cHM6Ly9kZXZlbG9wZXIuYW1kLmNvbT9SZWxheVN0YXRlPQ=="
@@ -89,6 +91,9 @@ def find_st(html):
 # REALISTIC DATA
 # ═══════════════════════════════════════════════════════════════
 EMAIL_DOMAINS = ["richardsheingold.com"]
+
+# Counter file for Gmail "+" trick sequential numbering
+PLUS_COUNTER_FILE = Path(__file__).parent / ".plus_counter"
 
 NAMES = [
     # Asia
@@ -191,12 +196,55 @@ def pick_proxy():
     }
 
 
+def _next_plus_counter():
+    """Get next sequential number for Gmail tricks."""
+    counter = 1
+    if PLUS_COUNTER_FILE.exists():
+        try:
+            counter = int(PLUS_COUNTER_FILE.read_text().strip()) + 1
+        except ValueError:
+            counter = 1
+    PLUS_COUNTER_FILE.write_text(str(counter))
+    return counter
+
+
+def _gmail_dot_variant(base, index):
+    """Generate a unique Gmail dot variant from base username.
+    Gmail ignores dots, so a.ngelabriptu = angelabriptu = an.gelabriptu.
+    AMD sees them as different emails — perfect for mass registration.
+    Uses binary representation of index to decide where to place dots.
+    """
+    if index <= 0:
+        return base
+    positions = len(base) - 1  # possible dot positions (between chars)
+    if index >= (2 ** positions):
+        return None  # exhausted all combinations
+    result = [base[0]]
+    for i in range(1, len(base)):
+        if index & (1 << (i - 1)):
+            result.append('.')
+        result.append(base[i])
+    return ''.join(result)
+
+
 def generate_person():
     first, last, country, company = random.choice(NAMES)
-    domain = random.choice(EMAIL_DOMAINS)
     num = random.randint(10, 99)
-    email = f"{first.lower()}.{last.lower()}{num}@{domain}"
     github = f"{first.lower()}{last.lower()}{num}"
+
+    # Gmail dot trick: a.ngelabriptu@gmail.com, an.gelabriptu@gmail.com, etc.
+    if GMAIL_PLUS_BASE:
+        seq = _next_plus_counter()
+        variant = _gmail_dot_variant(GMAIL_PLUS_BASE, seq)
+        if variant is None:
+            log(f"WARNING: Exhausted all dot variants for {GMAIL_PLUS_BASE}!", "⚠️")
+            variant = f"{GMAIL_PLUS_BASE}+amd{seq:03d}"  # fallback to + trick
+        email = f"{variant}@{EMAIL_DOMAIN}"
+        log(f"Gmail dot email: {email}", "📧")
+    else:
+        domain = random.choice(EMAIL_DOMAINS)
+        email = f"{first.lower()}.{last.lower()}{num}@{domain}"
+
     return {
         "first": first, "last": last, "email": email, "github": github,
         "company": company, "country_code": country,
@@ -239,12 +287,15 @@ async def step1_register(page, person):
     for i in range(8):
         await page.wait_for_timeout(5000)
         url = page.url
+        log(f"Wait {i+1}/8 — URL: {url[:80]}")
         if "activate" in url.lower():
             log("Registered!", "✅")
             return True
         text = ""
         try: text = await page.inner_text("body")
         except: pass
+        if i == 0:
+            log(f"Page text (first 200): {text[:200]}")
         if "First Name" in text and len(text) > 500:
             # Retry fill
             await page.fill('#form-text-1444782869', person['first'])
@@ -260,6 +311,13 @@ async def step1_register(page, person):
                 return True
             break
 
+    # Debug: save screenshot and page content
+    try:
+        await page.screenshot(path=str(DATA_DIR / f"reg_fail_{person['email'].replace('@','_')}.png"))
+        content = await page.content()
+        (DATA_DIR / f"reg_fail_{person['email'].replace('@','_')}.html").write_text(content)
+        log(f"Debug screenshot saved. URL: {page.url}")
+    except: pass
     log("Registration failed", "❌")
     return False
 

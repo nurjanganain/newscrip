@@ -4,7 +4,8 @@
   "imap_user": "your_email@gmail.com",
   "imap_password": "your_app_password_here",
   "captcha_key": "your_2captcha_api_key",
-  "email_domain": "your_domain.com",
+  "email_domain": "gmail.com",
+  "gmail_plus_base": "your_gmail_username",
   "proxy_list": [
     {"host": "38.154.203.95", "port": 5863, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
     {"host": "198.105.121.200", "port": 6462, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
