@@ -30,6 +30,7 @@ PASSWORD = CFG["password"]
 IMAP_HOST = CFG["imap_host"]
 IMAP_USER = CFG["imap_user"]
 IMAP_PW = CFG["imap_password"]
+PROXY_LIST = CFG.get("proxy_list", [])
 
 REGISTER_URL = "https://www.amd.com/en/registration/ai-dev-program-sign-up-form.html"
 CUSTTARG = "aHR0cHM6Ly9kZXZlbG9wZXIuYW1kLmNvbT9SZWxheVN0YXRlPQ=="
@@ -169,6 +170,25 @@ OUTCOMES = [
     "Migrate AI workloads from NVIDIA to AMD ecosystem",
     "Validate AMD GPU cloud for research computing needs",
 ]
+
+
+def pick_proxy():
+    """Pick a random proxy from the list. Returns dict with playwright and requests formats."""
+    if not PROXY_LIST:
+        return None
+    p = random.choice(PROXY_LIST)
+    return {
+        "playwright": {
+            "server": f"http://{p['host']}:{p['port']}",
+            "username": p["user"],
+            "password": p["pass"],
+        },
+        "requests": {
+            "http": f"http://{p['user']}:{p['pass']}@{p['host']}:{p['port']}",
+            "https": f"http://{p['user']}:{p['pass']}@{p['host']}:{p['port']}",
+        },
+        "display": f"{p['host']}:{p['port']}",
+    }
 
 
 def generate_person():
@@ -336,9 +356,12 @@ async def step3_activate(page, token):
 # ═══════════════════════════════════════════════════════════════
 # STEP 4: LOGIN → BEARER TOKEN (HTTP)
 # ═══════════════════════════════════════════════════════════════
-def step4_login(email_addr):
+def step4_login(email_addr, proxy=None):
     log("Logging in via Okta...")
     s = req.Session()
+    if proxy:
+        s.proxies.update(proxy["requests"])
+        log(f"HTTP via proxy: {proxy['display']}")
     fp = random.choice(FINGERPRINTS)
     s.headers.update({"user-agent": fp["ua"]})
     verifier = gen_cv()
@@ -529,8 +552,16 @@ async def run_pipeline(person):
     print(f"  {person['company']} | {person['country_label']}")
     print(f"{'='*60}")
 
-    # Launch CloakBrowser
-    browser = await cloakbrowser.launch_async(headless=True, args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"])
+    # Pick proxy
+    proxy = pick_proxy()
+    if proxy:
+        log(f"Using proxy: {proxy['display']}", "🌐")
+
+    # Launch CloakBrowser with proxy
+    launch_opts = {"headless": True, "args": ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]}
+    if proxy:
+        launch_opts["proxy"] = proxy["playwright"]
+    browser = await cloakbrowser.launch_async(**launch_opts)
     page = await browser.new_page()
 
     try:
@@ -550,7 +581,7 @@ async def run_pipeline(person):
 
         # Step 4: Login (HTTP)
         await asyncio.sleep(5)
-        bearer = step4_login(email)
+        bearer = step4_login(email, proxy=proxy)
         if not bearer:
             return {"email": email, "status": "LOGIN_FAILED"}
 
