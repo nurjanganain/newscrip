@@ -1,7 +1,10 @@
 config.json
 data/
-*.json
-*.txt
 *.log
+*.txt
+!requirements.txt
 !config.example.json
 __pycache__/
+.plus_counter
+*.png
+check_credit.py

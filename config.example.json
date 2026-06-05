@@ -1,21 +1,11 @@
 {
-  "password": "your_password_here",
+  "password": "YourSecurePass123!",
   "imap_host": "imap.gmail.com",
   "imap_user": "your_email@gmail.com",
-  "imap_password": "your_app_password_here",
-  "captcha_key": "your_2captcha_api_key",
+  "imap_password": "your_16char_app_password",
   "email_domain": "gmail.com",
   "gmail_plus_base": "your_gmail_username",
   "proxy_list": [
-    {"host": "38.154.203.95", "port": 5863, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "198.105.121.200", "port": 6462, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "64.137.96.74", "port": 6641, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "209.127.138.10", "port": 5784, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "38.154.185.97", "port": 6370, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "84.247.60.125", "port": 6095, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "142.111.67.146", "port": 5611, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "191.96.254.138", "port": 6185, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "31.58.9.4", "port": 6077, "user": "wnulegcr", "pass": "f36k8i1zqmek"},
-    {"host": "104.239.107.47", "port": 5699, "user": "wnulegcr", "pass": "f36k8i1zqmek"}
+    {"host": "1.2.3.4", "port": 8080, "user": "proxy_user", "pass": "proxy_pass"}
   ]
 }

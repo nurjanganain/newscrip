@@ -1,39 +1,57 @@
-# AMD Developer Cloud — Auto Registration & Credit
+# AMD Developer Cloud — Registration & Credit Pipeline
 
-Automated pipeline for AMD Developer Cloud account registration, email verification, and GPU credit requests.
+Automated pipeline for AMD Developer Cloud account registration, email
+verification, Okta login, and GPU free-credit requests.
 
 ## Features
 
-- **Full AMD Pipeline** — Register → Activate → Login → Credit Request
-- **DigitalOcean Account** — Auto register + email verification
-- **FunCaptcha Solver** — 2Captcha integration
-- **Email Automation** — IMAP polling for tokens & verification codes
-- **Anti-Detection** — CloakBrowser with fingerprint rotation
-- **Realistic Data** — Names, companies, use cases per region
+| Feature | Details |
+|---------|---------|
+| **Full AMD Pipeline** | Register → Activate → Okta Login → Credit Request |
+| **Gmail Dot Trick** | Generate 2 047 unique email variants from one inbox |
+| **Proxy Rotation** | Webshare datacenter proxies (configurable) |
+| **IMAP Automation** | Polls activation tokens & OTP codes automatically |
+| **Anti-Detection** | CloakBrowser with fingerprint rotation |
+| **Structured Logging** | Console + rotating file log (`data/run.log`) |
+| **Config Validation** | Fails fast with clear error on missing keys |
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/nurjanganain/newscrip.git
+cd newscrip
+
+# 2. Install
+pip install -r requirements.txt
+
+# 3. Configure
+cp config.example.json config.json
+# Edit config.json — see "Configuration" below
+
+# 4. Run
+python3 amdregister.py --count 5          # Register 5 accounts
+python3 amdregister.py --email a@b.com    # Register one specific email
+```
 
 ## Scripts
 
-### `amdregister.py`
-Full AMD Cloud Credit pipeline:
-1. Register at www.amd.com (CloakBrowser)
-2. Fetch activation token from email (IMAP)
-3. Activate account with token + password
-4. Login via Okta → Bearer token (HTTP)
-5. Submit credit request (Marketo form)
+### `amdregister.py` — Main Pipeline
+
+| Step | Action | Method |
+|------|--------|--------|
+| 1 | Register account on www.amd.com | CloakBrowser + proxy |
+| 2 | Fetch activation token | IMAP polling |
+| 3 | Activate account (set password) | CloakBrowser |
+| 4 | Login via Okta PKCE flow | HTTP (requests) |
+| 5 | Submit free-credit request | Marketo form (CloakBrowser) |
 
 ```bash
 python3 amdregister.py --count 3
 python3 amdregister.py --email user@domain.com --name "Erik Hansen" --company "MIT" --country US
 ```
 
-### `do_activate.py`
-DigitalOcean account registration:
-1. Fetch "Confirm your AMD Developer Cloud account" email → visit link
-2. Fetch "Welcome to the AMD developer cloud" email → get DO waves link
-3. Register at devcloud.amd.com (using waves link if available)
-4. Solve FunCaptcha via 2Captcha
-5. Inject token via Arkose API
-6. If already registered → auto skip
+### `do_activate.py` — DigitalOcean Activation
 
 ```bash
 python3 do_activate.py --input do_pending.json
@@ -41,109 +59,91 @@ python3 do_activate.py --email user@domain.com
 python3 do_activate.py --all
 ```
 
-## Setup
+## Configuration
 
-1. Clone repo:
-```bash
-git clone https://github.com/gieskuy5/amd-register.git
-cd amd-register
-```
+Copy `config.example.json` to `config.json` and fill in:
 
-2. Install dependencies:
-```bash
-pip install cloakbrowser requests
-```
+| Field | Required | Description |
+|-------|----------|-------------|
+| `password` | ✓ | Shared password for all accounts (10+ chars, mixed case + number + symbol) |
+| `imap_host` | ✓ | IMAP server — `imap.gmail.com` for Gmail |
+| `imap_user` | ✓ | Gmail address for receiving verification emails |
+| `imap_password` | ✓ | Gmail App Password (16-char, from Google Account settings) |
+| `email_domain` | | Domain part of generated emails (e.g. `gmail.com`) |
+| `gmail_plus_base` | | Gmail username without `@domain` — enables dot-trick variants |
+| `proxy_list` | | Array of `{host, port, user, pass}` proxy entries |
 
-3. Create config:
-```bash
-cp config.example.json config.json
-```
+### Gmail App Password Setup
 
-4. Edit `config.json` with your credentials:
-```json
-{
-  "password": "your_password",
-  "imap_host": "imap.gmail.com",
-  "imap_user": "your_email@gmail.com",
-  "imap_password": "your_app_password",
-  "captcha_key": "your_2captcha_api_key",
-  "email_domain": "your_domain.com"
-}
-```
+1. Enable **2-Step Verification**: https://myaccount.google.com/signinoptions/two-step-verification
+2. Create App Password: https://myaccount.google.com/apppasswords
+3. Name it "AMD Script" → copy the 16-character password into `imap_password`
+4. Enable IMAP: Gmail → Settings → Forwarding and POP/IMAP → Enable IMAP
 
-## Config Fields
+### Gmail Dot Trick
 
-| Field | Description |
-|-------|-------------|
-| `password` | Password for all registered accounts |
-| `imap_host` | IMAP server (e.g., imap.gmail.com) |
-| `imap_user` | Email address for receiving verification emails |
-| `imap_password` | App password for IMAP access |
-| `captcha_key` | 2Captcha API key |
-| `email_domain` | Domain for catch-all email (e.g., richardsheingold.com) |
+When `gmail_plus_base` is set (e.g. `angelabriptu`), the script generates unique
+email addresses by inserting dots: `a.ngelabriptu`, `an.gelabriptu`,
+`a.n.gelabriptu`, etc. Gmail ignores dots, so all variants deliver to the same
+inbox. AMD sees them as different addresses. One base username with 12 characters
+yields **2 047 unique variants**.
 
-## Output Files
+## Output
 
-- `success.txt` — Successfully registered accounts (`email:password:date`)
-- `do_activate_results.json` — DO registration results
-- `data/` — Screenshots and debug files
+| File | Contents |
+|------|----------|
+| `success.txt` | Registered accounts — `email:password:date` |
+| `data/run.log` | Detailed debug log with timestamps |
+| `data/*.png` | Debug screenshots on failure |
 
 ## Requirements
 
-- Python 3.8+
-- [CloakBrowser](https://github.com/nicepkg/cloakbrowser) — Stealth browser
-- [2Captcha](https://2captcha.com/) — CAPTCHA solving service
-- Catch-all email domain — For receiving verification emails
+- Python 3.10+
+- [CloakBrowser](https://pypi.org/project/cloakbrowser/) — stealth Playwright wrapper
+- Gmail account with IMAP + App Password
+- (Optional) Proxy list for IP rotation
 
-## How It Works
+## Architecture
 
-### AMD Registration Flow
 ```
-www.amd.com/register → Fill form → CAPTCHA → Email activation
-     ↓
-Fetch token from IMAP → Activate account → Okta login
-     ↓
-Marketo credit form → Set values → Submit → Credits approved
+┌──────────────────────────────────────────────────────────────┐
+│  amdregister.py                                              │
+│                                                              │
+│  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐     │
+│  │ Step 1  │──▶│ Step 2  │──▶│ Step 3  │──▶│ Step 4  │──┐  │
+│  │Register │   │ Token   │   │Activate │   │ Okta    │  │  │
+│  │(Browser)│   │ (IMAP)  │   │(Browser)│   │ (HTTP)  │  │  │
+│  └─────────┘   └─────────┘   └─────────┘   └─────────┘  │  │
+│                                                          ▼  │
+│                                              ┌─────────┐    │
+│                                              │ Step 5  │    │
+│                                              │ Credit  │    │
+│                                              │(Marketo)│    │
+│                                              └─────────┘    │
+│                                                              │
+│  Config: config.json    Proxies: Webshare    Logs: data/    │
+└──────────────────────────────────────────────────────────────┘
 ```
-
-### DigitalOcean Registration Flow
-```
-devcloud.amd.com/register → Fill form → FunCaptcha appears
-     ↓
-Extract UUID from iframe → 2Captcha solves → Token injected
-     ↓
-POST to /shield-service/arkose/v1/result → Account created
-     ↓
-Login → 6-digit code from email → Verify → Dashboard access
-```
-
-## Anti-Detection
-
-- CloakBrowser with stealth mode
-- User-Agent rotation (8 fingerprints)
-- Indonesian SOCKS proxy (optional)
-- Random delays between operations
-- Unique browser context per account
 
 ## Troubleshooting
 
-**CAPTCHA fails:**
-- Check 2Captcha balance
-- Try again (intermittent failures)
+| Problem | Solution |
+|---------|----------|
+| **IMAP login failed** | Check App Password; ensure IMAP enabled in Gmail |
+| **Registration timeout** | Proxy may be blocked by Cloudflare; try different proxy |
+| **OTP not received** | Check IMAP user matches recipient; check spam |
+| **Credit form failed** | Marketo fields may have changed; check form HTML |
+| **"Already registered"** | Email already used — script will fail at step 1 |
 
-**Email not received:**
-- Verify IMAP credentials
-- Check spam folder
-- Wait longer (up to 3 minutes)
+## Important Notes
 
-**"Already registered":**
-- Script auto-detects and skips to verification
-- Account still gets processed
+- **Credit requests ≠ instant credits.** The Marketo form submits a *request*.
+  AMD reviews and approves credits manually (1–2 business days).
+- **Bulk accounts may be rejected.** AMD may deny credit requests from multiple
+  accounts sharing similar identity signals (same inbox, IP, etc.).
+- **Proxies are datacenter IPs.** Some sites (Cloudflare) may block them.
+  Residential proxies improve success rate but are not free.
 
 ## License
 
 MIT
-
-## Author
-
-[@DezmonDzhino](https://twitter.com/DezmonDzhino)
